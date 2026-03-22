@@ -20,3 +20,5 @@ local.properties
 .localappdata/
 .tmp/
 .tools/
+.signing/
+keystore.properties
