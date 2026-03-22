@@ -1,9 +1,14 @@
 package com.huafeng.beaconzone
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,43 +23,60 @@ fun ZoneListScreen(
     onEdit: (Zone) -> Unit,
     onBack: () -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("区域配置") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
-                actions = { TextButton(onClick = onAdd) { Text("新增") } }
-            )
-        }
-    ) { inner ->
-        if (zones.isEmpty()) {
-            Box(
-                Modifier.padding(inner).fillMaxSize(),
-                contentAlignment = Alignment.Center
+    BackHandler(onBack = onBack)
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        val compactTopInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() * 0.4f
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, top = compactTopInset, bottom = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("还没有区域，点右上角“新增”")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text("区域配置", style = MaterialTheme.typography.titleLarge)
+                }
+                TextButton(onClick = onAdd) { Text("新增") }
             }
-        } else {
-            LazyColumn(
-                Modifier.padding(inner).fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(zones, key = { it.id }) { z ->
-                    Card(
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .fillMaxWidth()
-                            .clickable { onEdit(z) }
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(z.name, style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.height(6.dp))
-                            Text("UUID: ${z.uuid}")
-                            Text("major/minor: ${z.major}/${z.minor}")
+
+            Spacer(Modifier.height(12.dp))
+
+            if (zones.isEmpty()) {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("还没有区域，请点击右上角“新增”")
+                }
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(zones, key = { it.id }) { z ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onEdit(z) }
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(z.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.height(4.dp))
+                                Text("UUID: ${z.uuid}", style = MaterialTheme.typography.bodySmall)
+                                Text("Major/Minor: ${z.major} / ${z.minor}", style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
-                item { Spacer(Modifier.height(12.dp)) }
             }
         }
     }
@@ -69,81 +91,105 @@ fun ZoneEditScreen(
     onDelete: (() -> Unit)?,
     onBack: () -> Unit
 ) {
+    BackHandler(onBack = onBack)
+
     var name by remember { mutableStateOf(initial?.name.orEmpty()) }
     var uuid by remember { mutableStateOf(initial?.uuid.orEmpty()) }
     var major by remember { mutableStateOf(initial?.major?.toString().orEmpty()) }
     var minor by remember { mutableStateOf(initial?.minor?.toString().orEmpty()) }
     var err by remember { mutableStateOf<String?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = { TextButton(onClick = onBack) { Text("返回") } }
-            )
-        }
-    ) { inner ->
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        val compactTopInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() * 0.4f
         Column(
-            Modifier.padding(inner).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, top = compactTopInset, bottom = 8.dp)
         ) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("区域名称") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = uuid,
-                onValueChange = { uuid = it },
-                label = { Text("绑定 UUID") },
-                placeholder = { Text("例如：01122334-4556-6778-899a-abbccddeeff0") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = major,
-                    onValueChange = { major = it },
-                    label = { Text("major") },
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = minor,
-                    onValueChange = { minor = it },
-                    label = { Text("minor") },
-                    modifier = Modifier.weight(1f)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(title, style = MaterialTheme.typography.titleLarge)
             }
 
-            err?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Spacer(Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = {
-                        val mj = major.toIntOrNull()
-                        val mn = minor.toIntOrNull()
-                        when {
-                            name.isBlank() -> err = "区域名称不能为空"
-                            uuid.isBlank() -> err = "UUID 不能为空"
-                            mj == null -> err = "major 必须是整数"
-                            mn == null -> err = "minor 必须是整数"
-                            else -> {
-                                err = null
-                                val z = Zone(
-                                    id = initial?.id ?: Zone(name = "", uuid = "", major = 0, minor = 0).id,
-                                    name = name.trim(),
-                                    uuid = uuid.trim(),
-                                    major = mj,
-                                    minor = mn
-                                )
-                                onSave(z)
+            Column(
+                Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("区域名称") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = uuid,
+                    onValueChange = { uuid = it },
+                    label = { Text("绑定 UUID") },
+                    placeholder = { Text("例如：01122334-4556-6778-899a-abbccddeeff0") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = major,
+                        onValueChange = { major = it },
+                        label = { Text("major") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = minor,
+                        onValueChange = { minor = it },
+                        label = { Text("minor") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (err != null) {
+                    Text(err!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            val mj = major.toIntOrNull()
+                            val mn = minor.toIntOrNull()
+                            when {
+                                name.isBlank() -> err = "区域名称不能为空"
+                                uuid.isBlank() -> err = "UUID 不能为空"
+                                mj == null -> err = "major 必须是整数"
+                                mn == null -> err = "minor 必须是整数"
+                                else -> {
+                                    err = null
+                                    val z = Zone(
+                                        id = initial?.id ?: java.util.UUID.randomUUID().toString(),
+                                        name = name.trim(),
+                                        uuid = uuid.trim(),
+                                        major = mj,
+                                        minor = mn
+                                    )
+                                    onSave(z)
+                                }
                             }
                         }
-                    }
-                ) { Text("保存") }
+                    ) { Text("保存配置") }
 
-                if (onDelete != null) {
-                    OutlinedButton(onClick = onDelete) { Text("删除") }
+                    if (onDelete != null) {
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            onClick = onDelete
+                        ) { Text("删除区域") }
+                    }
                 }
             }
         }
