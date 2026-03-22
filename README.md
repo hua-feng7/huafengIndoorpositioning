@@ -1,3 +1,4 @@
+# 98%为AI生成
 # HuaFeng室内定位
 
 `HuaFeng室内定位` 是一个基于 Android 的室内定位与区域识别应用，支持 `BLE Beacon`、`WiFi` 和 `BLE+WiFi` 混合指纹定位。项目使用 `Kotlin + Jetpack Compose` 开发，内置地图采集、指纹管理、区域绑定、算法切换、参数调试与本地数据存储能力，适合做室内定位实验、指纹库构建、算法验证和现场部署测试。
