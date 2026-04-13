@@ -124,7 +124,7 @@ class MainActivity : ComponentActivity() {
     // zones 仍然用于“区域判断”功能（扫描页显示当前区域）
     @Volatile private var latestZones: List<Zone> = emptyList()
 
-    // ====== 稳定关键：缓存 + TTL + EMA ======
+    // ====== 稳定：缓存 + TTL + EMA ======
     private val bleCache = mutableMapOf<String, BeaconRow>()
     private val wifiCache = mutableMapOf<String, BeaconRow>()
     private val TTL_MS = 3000L
@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // -------------------- 权限 --------------------
+    // -------------------- 获取权限 --------------------
     private fun hasBlePerms(): Boolean {
         val locOk = ContextCompat.checkSelfPermission(
             this,

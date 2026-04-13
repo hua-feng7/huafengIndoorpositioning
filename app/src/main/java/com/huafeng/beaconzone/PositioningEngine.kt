@@ -20,8 +20,6 @@ data class PositioningConfig(
     val enableClusterPrefilter: Boolean = true,
     val clusterCellSizePx: Float = 160f,
     val clusterCount: Int = 3,
-    val enableTemporalSmoothing: Boolean = true,
-    val smoothingFactor: Double = 0.55,
     val missingPenalty: Double = 12.0
 )
 
@@ -40,6 +38,11 @@ data class PositionEstimate(
 )
 
 object PositioningEngine {
+    private enum class SignalFamily {
+        BLE,
+        WIFI
+    }
+
     fun buildBeaconKey(uuid: String, major: Int, minor: Int): String = "ble:$uuid:$major:$minor"
     fun buildWifiKey(bssid: String): String = "wifi:$bssid"
 
@@ -52,8 +55,7 @@ object PositioningEngine {
         liveRssi: Map<String, Double>,
         fingerprints: List<FingerprintSample>,
         config: PositioningConfig = PositioningConfig(),
-        currentFingerprintId: Long? = null,
-        previousEstimate: PositionEstimate? = null
+        currentFingerprintId: Long? = null
     ): PositionEstimate? {
         if (liveRssi.isEmpty() || fingerprints.isEmpty()) return null
 
@@ -68,6 +70,9 @@ object PositioningEngine {
             liveRssi = effectiveLiveRssi,
             fingerprints = fingerprints,
             config = config
+        ).preserveCurrentFingerprint(
+            allFingerprints = fingerprints,
+            currentFingerprintId = currentFingerprintId
         )
 
         val scored = candidateFingerprints.map { sample ->
@@ -103,18 +108,11 @@ object PositioningEngine {
             )
         } ?: return null
 
-        val hysteresisApplied = applyHysteresis(
+        return applyHysteresis(
             candidate = candidate,
             scored = scored,
             currentFingerprintId = currentFingerprintId,
             switchMargin = config.switchMargin
-        )
-
-        return applyTemporalSmoothing(
-            candidate = hysteresisApplied,
-            previousEstimate = previousEstimate,
-            enabled = config.enableTemporalSmoothing,
-            smoothingFactor = config.smoothingFactor
         )
     }
 
@@ -192,6 +190,15 @@ object PositioningEngine {
         )
     }
 
+    private fun List<FingerprintSample>.preserveCurrentFingerprint(
+        allFingerprints: List<FingerprintSample>,
+        currentFingerprintId: Long?
+    ): List<FingerprintSample> {
+        if (currentFingerprintId == null || any { it.id == currentFingerprintId }) return this
+        val current = allFingerprints.firstOrNull { it.id == currentFingerprintId } ?: return this
+        return this + current
+    }
+
     private fun applyHysteresis(
         candidate: PositionEstimate,
         scored: List<Pair<FingerprintSample, Double>>,
@@ -215,23 +222,6 @@ object PositioningEngine {
         }
     }
 
-    private fun applyTemporalSmoothing(
-        candidate: PositionEstimate,
-        previousEstimate: PositionEstimate?,
-        enabled: Boolean,
-        smoothingFactor: Double
-    ): PositionEstimate {
-        if (!enabled || previousEstimate == null) return candidate
-
-        val alpha = smoothingFactor.coerceIn(0.0, 1.0)
-        if (alpha >= 1.0) return candidate
-
-        return candidate.copy(
-            xPx = (previousEstimate.xPx * (1 - alpha) + candidate.xPx * alpha).toFloat(),
-            yPx = (previousEstimate.yPx * (1 - alpha) + candidate.yPx * alpha).toFloat()
-        )
-    }
-
     private fun keepStrongestBeacons(
         liveRssi: Map<String, Double>,
         strongestBeaconCount: Int
@@ -248,7 +238,92 @@ object PositioningEngine {
         b: Map<String, Double>,
         missingPenalty: Double
     ): Double {
+        val activeFamilies = a.keys
+            .mapNotNull(::detectSignalFamily)
+            .toSet()
+
+        if (activeFamilies.isEmpty()) return Double.MAX_VALUE
+
+        val familyScores = activeFamilies.mapNotNull { family ->
+            calculateDistanceForFamily(
+                a = a,
+                b = b,
+                family = family,
+                missingPenalty = missingPenalty
+            )
+        }
+
+        return familyScores.takeIf { it.isNotEmpty() }?.average() ?: Double.MAX_VALUE
+    }
+
+    private fun calculateDistanceForFamily(
+        a: Map<String, Double>,
+        b: Map<String, Double>,
+        family: SignalFamily,
+        missingPenalty: Double
+    ): Double? {
+        val familyA = a.filterKeys { detectSignalFamily(it) == family }
+        val familyB = b.filterKeys { detectSignalFamily(it) == family }
+        val keys = (familyA.keys + familyB.keys).toSet()
+        if (keys.isEmpty()) return null
+
+        return when (family) {
+            SignalFamily.BLE -> calculateBleDistance(
+                a = familyA,
+                b = familyB,
+                missingPenalty = missingPenalty
+            )
+
+            SignalFamily.WIFI -> calculateGenericDistance(
+                keys = keys,
+                a = familyA,
+                b = familyB,
+                missingPenalty = missingPenalty
+            )
+        }
+    }
+
+    private fun calculateBleDistance(
+        a: Map<String, Double>,
+        b: Map<String, Double>,
+        missingPenalty: Double
+    ): Double {
         val keys = (a.keys + b.keys).toSet()
+        if (keys.isEmpty()) return Double.MAX_VALUE
+
+        val commonKeys = a.keys.intersect(b.keys)
+        if (commonKeys.isEmpty()) {
+            return missingPenalty * 1.8
+        }
+
+        var weightedSum = 0.0
+        var totalWeight = 0.0
+        commonKeys.forEach { key ->
+            val av = a.getValue(key)
+            val bv = b.getValue(key)
+            val delta = av - bv
+            val weight = bleSignalWeight(maxOf(av, bv))
+            weightedSum += delta * delta * weight
+            totalWeight += weight
+        }
+
+        val overlapRatio = commonKeys.size.toDouble() / keys.size
+        val weightedRmse = if (totalWeight > 0.0) {
+            sqrt(weightedSum / totalWeight)
+        } else {
+            missingPenalty
+        }
+        val missingComponent = missingPenalty * (1.0 - overlapRatio)
+
+        return weightedRmse + missingComponent
+    }
+
+    private fun calculateGenericDistance(
+        keys: Set<String>,
+        a: Map<String, Double>,
+        b: Map<String, Double>,
+        missingPenalty: Double
+    ): Double {
         var sum = 0.0
         for (key in keys) {
             val av = a[key]
@@ -256,7 +331,18 @@ object PositioningEngine {
             val delta = if (av != null && bv != null) av - bv else missingPenalty
             sum += delta * delta
         }
-        return sqrt(sum)
+        return sqrt(sum / keys.size)
+    }
+
+    private fun bleSignalWeight(rssi: Double): Double {
+        val normalized = (rssi + 100.0) / 40.0
+        return normalized.coerceIn(0.35, 1.5)
+    }
+
+    private fun detectSignalFamily(key: String): SignalFamily? = when {
+        key.startsWith("ble:") -> SignalFamily.BLE
+        key.startsWith("wifi:") -> SignalFamily.WIFI
+        else -> null
     }
 
     private fun mergeRssiMaps(rssiMaps: List<Map<String, Double>>): Map<String, Double> {

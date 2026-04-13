@@ -225,9 +225,11 @@ fun MapCollectScreen(
     var locating by remember { mutableStateOf(false) }
     var snappedId by remember { mutableStateOf<Long?>(null) }
     var snappedPx by remember { mutableStateOf<Pair<Float, Float>?>(null) }
-    var lastEstimate by remember { mutableStateOf<PositionEstimate?>(null) }
     var lastPositioningCostMs by remember { mutableLongStateOf(0L) }
     var mapContainerSize by remember { mutableStateOf(IntSize.Zero) }
+    val smoothingAlpha = remember(enableTemporalSmoothing, smoothingFactorInput) {
+        smoothingFactorInput.toDoubleOrNull()?.coerceIn(0.0, 1.0) ?: 0.55
+    }
 
     val beaconCount = liveRows.size
     val averageRssi = remember(liveRows) {
@@ -257,9 +259,7 @@ fun MapCollectScreen(
             switchMargin = switchMarginInput.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0,
             enableClusterPrefilter = enableClusterPrefilter,
             clusterCellSizePx = clusterCellSizeInput.toFloatOrNull()?.coerceAtLeast(32f) ?: 160f,
-            clusterCount = clusterCountInput.toIntOrNull()?.coerceAtLeast(1) ?: 3,
-            enableTemporalSmoothing = enableTemporalSmoothing,
-            smoothingFactor = smoothingFactorInput.toDoubleOrNull()?.coerceIn(0.0, 1.0) ?: 0.55
+            clusterCount = clusterCountInput.toIntOrNull()?.coerceAtLeast(1) ?: 3
         )
     }
 
@@ -323,15 +323,20 @@ fun MapCollectScreen(
                         liveRssi = PositioningEngine.buildScanVector(liveRows),
                         fingerprints = fpVectors,
                         config = positioningConfig,
-                        currentFingerprintId = snappedId,
-                        previousEstimate = lastEstimate
+                        currentFingerprintId = snappedId
                     )
                 }
-                lastEstimate = estimate
                 snappedId = estimate?.fingerprintId
-                snappedPx = estimate?.let { it.xPx to it.yPx }
+                snappedPx = estimate?.let {
+                    smoothDisplayedPosition(
+                        previous = snappedPx,
+                        candidate = it.xPx to it.yPx,
+                        enabled = enableTemporalSmoothing,
+                        alpha = smoothingAlpha
+                    )
+                }
             } else {
-                lastEstimate = null
+                snappedPx = null
                 lastPositioningCostMs = 0L
             }
             delay(500)
@@ -340,7 +345,6 @@ fun MapCollectScreen(
 
     LaunchedEffect(locating) {
         if (!locating) {
-            lastEstimate = null
             snappedId = null
             snappedPx = null
             lastPositioningCostMs = 0L
@@ -482,7 +486,6 @@ fun MapCollectScreen(
                     Button(onClick = {
                         locating = !locating
                         if (!locating) {
-                            lastEstimate = null
                             snappedId = null
                             snappedPx = null
                             lastPositioningCostMs = 0L
@@ -629,6 +632,23 @@ private fun CollectionLoadingOverlay(
             }
         }
     }
+}
+
+private fun smoothDisplayedPosition(
+    previous: Pair<Float, Float>?,
+    candidate: Pair<Float, Float>,
+    enabled: Boolean,
+    alpha: Double
+): Pair<Float, Float> {
+    if (!enabled || previous == null) return candidate
+
+    val safeAlpha = alpha.coerceIn(0.0, 1.0)
+    if (safeAlpha >= 1.0) return candidate
+
+    return Pair(
+        (previous.first * (1 - safeAlpha) + candidate.first * safeAlpha).toFloat(),
+        (previous.second * (1 - safeAlpha) + candidate.second * safeAlpha).toFloat()
+    )
 }
 
 @Composable
