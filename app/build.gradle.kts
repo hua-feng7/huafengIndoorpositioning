@@ -24,8 +24,8 @@ android {
         applicationId = "com.huafeng.beaconzone"
         minSdk = 26
         targetSdk = 36
-        versionCode = 40
-        versionName = "1.49"
+        versionCode = 41
+        versionName = "1.50"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
