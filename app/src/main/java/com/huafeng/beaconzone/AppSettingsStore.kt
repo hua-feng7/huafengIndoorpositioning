@@ -59,6 +59,26 @@ class AppSettingsStore(ctx: Context) {
         sp.edit().putString(KEY_WEIGHT_POWER, value).apply()
     }
 
+    fun getEnableDensityCompensationWknn(): Boolean =
+        sp.getBoolean(KEY_ENABLE_DENSITY_COMPENSATION_WKNN, true)
+
+    fun setEnableDensityCompensationWknn(value: Boolean) {
+        sp.edit().putBoolean(KEY_ENABLE_DENSITY_COMPENSATION_WKNN, value).apply()
+    }
+
+    fun getDensityNeighborCountInput(): String = sp.getString(KEY_DENSITY_NEIGHBOR_COUNT, "5") ?: "5"
+
+    fun setDensityNeighborCountInput(value: String) {
+        sp.edit().putString(KEY_DENSITY_NEIGHBOR_COUNT, value).apply()
+    }
+
+    fun getDensityCompensationStrengthInput(): String =
+        sp.getString(KEY_DENSITY_COMPENSATION_STRENGTH, "1.0") ?: "1.0"
+
+    fun setDensityCompensationStrengthInput(value: String) {
+        sp.edit().putString(KEY_DENSITY_COMPENSATION_STRENGTH, value).apply()
+    }
+
     fun getSwitchMarginInput(): String = sp.getString(KEY_SWITCH_MARGIN, "0") ?: "0"
 
     fun setSwitchMarginInput(value: String) {
@@ -129,6 +149,9 @@ class AppSettingsStore(ctx: Context) {
         const val KEY_NEIGHBOR_COUNT = "neighbor_count"
         const val KEY_STRONGEST_BEACON_COUNT = "strongest_beacon_count"
         const val KEY_WEIGHT_POWER = "weight_power"
+        const val KEY_ENABLE_DENSITY_COMPENSATION_WKNN = "enable_density_compensation_wknn"
+        const val KEY_DENSITY_NEIGHBOR_COUNT = "density_neighbor_count"
+        const val KEY_DENSITY_COMPENSATION_STRENGTH = "density_compensation_strength"
         const val KEY_SWITCH_MARGIN = "switch_margin"
         const val KEY_ENABLE_CLUSTER_PREFILTER = "enable_cluster_prefilter"
         const val KEY_CLUSTER_CELL_SIZE = "cluster_cell_size"

@@ -444,6 +444,9 @@ class MainActivity : ComponentActivity() {
             var neighborCountInput by remember { mutableStateOf(settingsStore.getNeighborCountInput()) }
             var strongestBeaconCountInput by remember { mutableStateOf(settingsStore.getStrongestBeaconCountInput()) }
             var weightPowerInput by remember { mutableStateOf(settingsStore.getWeightPowerInput()) }
+            var enableDensityCompensationWknn by remember { mutableStateOf(settingsStore.getEnableDensityCompensationWknn()) }
+            var densityNeighborCountInput by remember { mutableStateOf(settingsStore.getDensityNeighborCountInput()) }
+            var densityCompensationStrengthInput by remember { mutableStateOf(settingsStore.getDensityCompensationStrengthInput()) }
             var switchMarginInput by remember { mutableStateOf(settingsStore.getSwitchMarginInput()) }
             var enableClusterPrefilter by remember { mutableStateOf(settingsStore.getEnableClusterPrefilter()) }
             var clusterCellSizeInput by remember { mutableStateOf(settingsStore.getClusterCellSizeInput()) }
@@ -584,6 +587,9 @@ class MainActivity : ComponentActivity() {
                                             neighborCountInput = neighborCountInput,
                                             strongestBeaconCountInput = strongestBeaconCountInput,
                                             weightPowerInput = weightPowerInput,
+                                            enableDensityCompensationWknn = enableDensityCompensationWknn,
+                                            densityNeighborCountInput = densityNeighborCountInput,
+                                            densityCompensationStrengthInput = densityCompensationStrengthInput,
                                             switchMarginInput = switchMarginInput,
                                             enableClusterPrefilter = enableClusterPrefilter,
                                             clusterCellSizeInput = clusterCellSizeInput,
@@ -644,6 +650,12 @@ class MainActivity : ComponentActivity() {
                                         onStrongestBeaconCountChange = { strongestBeaconCountInput = it.filter(Char::isDigit) },
                                         weightPowerInput = weightPowerInput,
                                         onWeightPowerChange = { weightPowerInput = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                                        enableDensityCompensationWknn = enableDensityCompensationWknn,
+                                        onEnableDensityCompensationWknnChange = { enableDensityCompensationWknn = it },
+                                        densityNeighborCountInput = densityNeighborCountInput,
+                                        onDensityNeighborCountChange = { densityNeighborCountInput = it.filter(Char::isDigit) },
+                                        densityCompensationStrengthInput = densityCompensationStrengthInput,
+                                        onDensityCompensationStrengthChange = { densityCompensationStrengthInput = it.filter { ch -> ch.isDigit() || ch == '.' } },
                                         switchMarginInput = switchMarginInput,
                                         onSwitchMarginChange = { switchMarginInput = it.filter { ch -> ch.isDigit() || ch == '.' } },
                                         enableClusterPrefilter = enableClusterPrefilter,
@@ -661,6 +673,9 @@ class MainActivity : ComponentActivity() {
                                             settingsStore.setNeighborCountInput(neighborCountInput)
                                             settingsStore.setStrongestBeaconCountInput(strongestBeaconCountInput)
                                             settingsStore.setWeightPowerInput(weightPowerInput)
+                                            settingsStore.setEnableDensityCompensationWknn(enableDensityCompensationWknn)
+                                            settingsStore.setDensityNeighborCountInput(densityNeighborCountInput)
+                                            settingsStore.setDensityCompensationStrengthInput(densityCompensationStrengthInput)
                                             settingsStore.setSwitchMarginInput(switchMarginInput)
                                             settingsStore.setEnableClusterPrefilter(enableClusterPrefilter)
                                             settingsStore.setClusterCellSizeInput(clusterCellSizeInput)
@@ -979,6 +994,12 @@ private fun SettingsScreen(
     onStrongestBeaconCountChange: (String) -> Unit,
     weightPowerInput: String,
     onWeightPowerChange: (String) -> Unit,
+    enableDensityCompensationWknn: Boolean,
+    onEnableDensityCompensationWknnChange: (Boolean) -> Unit,
+    densityNeighborCountInput: String,
+    onDensityNeighborCountChange: (String) -> Unit,
+    densityCompensationStrengthInput: String,
+    onDensityCompensationStrengthChange: (String) -> Unit,
     switchMarginInput: String,
     onSwitchMarginChange: (String) -> Unit,
     enableClusterPrefilter: Boolean,
@@ -1074,6 +1095,9 @@ private fun SettingsScreen(
                             neighborCountInput = neighborCountInput,
                             strongestBeaconCountInput = strongestBeaconCountInput,
                             weightPowerInput = weightPowerInput,
+                            enableDensityCompensationWknn = enableDensityCompensationWknn,
+                            densityNeighborCountInput = densityNeighborCountInput,
+                            densityCompensationStrengthInput = densityCompensationStrengthInput,
                             switchMarginInput = switchMarginInput,
                             enableClusterPrefilter = enableClusterPrefilter,
                             clusterCellSizeInput = clusterCellSizeInput,
@@ -1084,6 +1108,9 @@ private fun SettingsScreen(
                             onNeighborCountChange = onNeighborCountChange,
                             onStrongestBeaconCountChange = onStrongestBeaconCountChange,
                             onWeightPowerChange = onWeightPowerChange,
+                            onEnableDensityCompensationWknnChange = onEnableDensityCompensationWknnChange,
+                            onDensityNeighborCountChange = onDensityNeighborCountChange,
+                            onDensityCompensationStrengthChange = onDensityCompensationStrengthChange,
                             onSwitchMarginChange = onSwitchMarginChange,
                             onEnableClusterPrefilterChange = onEnableClusterPrefilterChange,
                             onClusterCellSizeChange = onClusterCellSizeChange,

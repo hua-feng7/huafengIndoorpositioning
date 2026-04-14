@@ -149,6 +149,9 @@ fun MapCollectScreen(
     neighborCountInput: String,
     strongestBeaconCountInput: String,
     weightPowerInput: String,
+    enableDensityCompensationWknn: Boolean,
+    densityNeighborCountInput: String,
+    densityCompensationStrengthInput: String,
     switchMarginInput: String,
     enableClusterPrefilter: Boolean,
     clusterCellSizeInput: String,
@@ -244,6 +247,9 @@ fun MapCollectScreen(
         neighborCountInput,
         strongestBeaconCountInput,
         weightPowerInput,
+        enableDensityCompensationWknn,
+        densityNeighborCountInput,
+        densityCompensationStrengthInput,
         switchMarginInput,
         enableClusterPrefilter,
         clusterCellSizeInput,
@@ -256,6 +262,9 @@ fun MapCollectScreen(
             neighborCount = neighborCountInput.toIntOrNull()?.coerceAtLeast(1) ?: 3,
             strongestBeaconCount = strongestBeaconCountInput.toIntOrNull()?.coerceAtLeast(1) ?: 3,
             weightPower = weightPowerInput.toDoubleOrNull()?.coerceAtLeast(0.1) ?: 1.0,
+            enableDensityCompensationWknn = enableDensityCompensationWknn,
+            densityNeighborCount = densityNeighborCountInput.toIntOrNull()?.coerceAtLeast(1) ?: 5,
+            densityCompensationStrength = densityCompensationStrengthInput.toDoubleOrNull()?.coerceIn(0.1, 3.0) ?: 1.0,
             switchMargin = switchMarginInput.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0,
             enableClusterPrefilter = enableClusterPrefilter,
             clusterCellSizePx = clusterCellSizeInput.toFloatOrNull()?.coerceAtLeast(32f) ?: 160f,
@@ -730,6 +739,9 @@ fun AlgorithmConfigPanel(
     neighborCountInput: String,
     strongestBeaconCountInput: String,
     weightPowerInput: String,
+    enableDensityCompensationWknn: Boolean,
+    densityNeighborCountInput: String,
+    densityCompensationStrengthInput: String,
     switchMarginInput: String,
     enableClusterPrefilter: Boolean,
     clusterCellSizeInput: String,
@@ -740,6 +752,9 @@ fun AlgorithmConfigPanel(
     onNeighborCountChange: (String) -> Unit,
     onStrongestBeaconCountChange: (String) -> Unit,
     onWeightPowerChange: (String) -> Unit,
+    onEnableDensityCompensationWknnChange: (Boolean) -> Unit,
+    onDensityNeighborCountChange: (String) -> Unit,
+    onDensityCompensationStrengthChange: (String) -> Unit,
     onSwitchMarginChange: (String) -> Unit,
     onEnableClusterPrefilterChange: (Boolean) -> Unit,
     onClusterCellSizeChange: (String) -> Unit,
@@ -836,6 +851,42 @@ fun AlgorithmConfigPanel(
                     "WKNN 使用欧氏距离倒数作为权重，权重形式为 1 / d^p。",
                     style = MaterialTheme.typography.bodySmall
                 )
+
+                SettingSwitchRow(
+                    title = "密度补偿 WKNN",
+                    subtitle = "降低高密度采样区域的天然优势，减轻结果被密集点拉偏",
+                    checked = enableDensityCompensationWknn,
+                    onCheckedChange = onEnableDensityCompensationWknnChange
+                )
+
+                if (enableDensityCompensationWknn) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = densityNeighborCountInput,
+                            onValueChange = onDensityNeighborCountChange,
+                            label = { Text("密度邻居数") },
+                            singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Number
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = densityCompensationStrengthInput,
+                            onValueChange = onDensityCompensationStrengthChange,
+                            label = { Text("补偿强度") },
+                            singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Text(
+                        "按空间邻居密度反向修正 WKNN 权重。邻居数越大越看整体密度，补偿强度越大越偏向稀疏区域。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
 
             PositioningAlgorithm.KNN_STRONGEST_BEACONS -> {

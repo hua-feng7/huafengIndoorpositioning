@@ -2,6 +2,7 @@ package com.huafeng.beaconzone
 
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.pow
 import kotlin.math.sqrt
 
 enum class PositioningAlgorithm(val label: String) {
@@ -16,6 +17,9 @@ data class PositioningConfig(
     val neighborCount: Int = 3,
     val strongestBeaconCount: Int = 3,
     val weightPower: Double = 1.0,
+    val enableDensityCompensationWknn: Boolean = true,
+    val densityNeighborCount: Int = 5,
+    val densityCompensationStrength: Double = 1.0,
     val switchMargin: Double = 0.0,
     val enableClusterPrefilter: Boolean = true,
     val clusterCellSizePx: Float = 160f,
@@ -102,9 +106,14 @@ object PositioningEngine {
             PositioningAlgorithm.WKNN,
             PositioningAlgorithm.KNN_STRONGEST_BEACONS -> estimateByKnn(
                 scored = scored,
+                allFingerprints = fingerprints,
                 neighborCount = config.neighborCount,
                 weighted = config.algorithm != PositioningAlgorithm.KNN,
-                weightPower = config.weightPower
+                weightPower = config.weightPower,
+                enableDensityCompensation = config.algorithm == PositioningAlgorithm.WKNN &&
+                    config.enableDensityCompensationWknn,
+                densityNeighborCount = config.densityNeighborCount,
+                densityCompensationStrength = config.densityCompensationStrength
             )
         } ?: return null
 
@@ -156,24 +165,39 @@ object PositioningEngine {
 
     private fun estimateByKnn(
         scored: List<Pair<FingerprintSample, Double>>,
+        allFingerprints: List<FingerprintSample>,
         neighborCount: Int,
         weighted: Boolean,
-        weightPower: Double
+        weightPower: Double,
+        enableDensityCompensation: Boolean,
+        densityNeighborCount: Int,
+        densityCompensationStrength: Double
     ): PositionEstimate? {
         if (scored.isEmpty()) return null
 
         val k = neighborCount.coerceAtLeast(1).coerceAtMost(scored.size)
         val nearest = scored.take(k)
+        val densityFactors = if (weighted && enableDensityCompensation) {
+            buildDensityCompensationMap(
+                fingerprints = allFingerprints,
+                densityNeighborCount = densityNeighborCount,
+                densityCompensationStrength = densityCompensationStrength
+            )
+        } else {
+            emptyMap()
+        }
         var weightedX = 0.0
         var weightedY = 0.0
         var totalWeight = 0.0
 
         nearest.forEach { (sample, distance) ->
-            val weight = if (weighted) {
+            val baseWeight = if (weighted) {
                 1.0 / Math.pow(distance + 1e-6, weightPower.coerceAtLeast(0.1))
             } else {
                 1.0
             }
+            val densityFactor = densityFactors[sample.id] ?: 1.0
+            val weight = baseWeight * densityFactor
             weightedX += sample.xPx * weight
             weightedY += sample.yPx * weight
             totalWeight += weight
@@ -188,6 +212,44 @@ object PositioningEngine {
             fingerprintId = anchor.first.id,
             distance = anchor.second
         )
+    }
+
+    private fun buildDensityCompensationMap(
+        fingerprints: List<FingerprintSample>,
+        densityNeighborCount: Int,
+        densityCompensationStrength: Double
+    ): Map<Long, Double> {
+        if (fingerprints.size <= 2) return emptyMap()
+
+        val neighborCount = densityNeighborCount
+            .coerceAtLeast(1)
+            .coerceAtMost((fingerprints.size - 1).coerceAtLeast(1))
+        val strength = densityCompensationStrength.coerceIn(0.1, 3.0)
+
+        val localSpacing = fingerprints.associate { sample ->
+            val meanDistance = fingerprints.asSequence()
+                .filter { it.id != sample.id }
+                .map { other -> euclideanDistance(sample.xPx, sample.yPx, other.xPx, other.yPx) }
+                .sorted()
+                .take(neighborCount)
+                .toList()
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+                ?: 0.0
+            sample.id to meanDistance
+        }
+
+        val globalMeanSpacing = localSpacing.values
+            .filter { it.isFinite() && it > 0.0 }
+            .average()
+            .takeIf { it.isFinite() && it > 0.0 }
+            ?: return emptyMap()
+
+        return localSpacing.mapValues { (_, spacing) ->
+            val normalizedSpacing = (spacing / globalMeanSpacing)
+                .coerceIn(0.6, 1.8)
+            normalizedSpacing.pow(strength)
+        }
     }
 
     private fun List<FingerprintSample>.preserveCurrentFingerprint(
@@ -354,5 +416,11 @@ object PositioningEngine {
             }
         }
         return valuesByKey.mapValues { (_, values) -> values.average() }
+    }
+
+    private fun euclideanDistance(x1: Float, y1: Float, x2: Float, y2: Float): Double {
+        val dx = x1 - x2
+        val dy = y1 - y2
+        return sqrt((dx * dx + dy * dy).toDouble())
     }
 }
