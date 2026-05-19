@@ -109,7 +109,7 @@ class AppSettingsStore(ctx: Context) {
         sp.edit().putBoolean(KEY_ENABLE_TEMPORAL_SMOOTHING, value).apply()
     }
 
-    fun getSmoothingFactorInput(): String = sp.getString(KEY_SMOOTHING_FACTOR, "0.55") ?: "0.55"
+    fun getSmoothingFactorInput(): String = sp.getString(KEY_SMOOTHING_FACTOR, "4.0") ?: "4.0"
 
     fun setSmoothingFactorInput(value: String) {
         sp.edit().putString(KEY_SMOOTHING_FACTOR, value).apply()

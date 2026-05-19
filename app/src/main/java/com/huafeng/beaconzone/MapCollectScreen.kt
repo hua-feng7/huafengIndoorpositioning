@@ -118,6 +118,50 @@ private fun mapImagePointToScreen(
     )
 }
 
+private class ScalarKalmanFilter(
+    private val processNoise: Double = 1.0
+) {
+    private var estimate = 0.0
+    private var covariance = 1.0
+    private var initialized = false
+
+    fun update(measurement: Float, measurementNoise: Double): Float {
+        val safeMeasurementNoise = measurementNoise.coerceAtLeast(0.01)
+        if (!initialized) {
+            estimate = measurement.toDouble()
+            covariance = 1.0
+            initialized = true
+            return measurement
+        }
+
+        covariance += processNoise
+        val gain = covariance / (covariance + safeMeasurementNoise)
+        estimate += gain * (measurement - estimate)
+        covariance *= 1.0 - gain
+        return estimate.toFloat()
+    }
+
+    fun reset() {
+        estimate = 0.0
+        covariance = 1.0
+        initialized = false
+    }
+}
+
+private class PositionKalmanFilter2D {
+    private val xFilter = ScalarKalmanFilter()
+    private val yFilter = ScalarKalmanFilter()
+
+    fun update(candidate: Pair<Float, Float>, measurementNoise: Double): Pair<Float, Float> =
+        xFilter.update(candidate.first, measurementNoise) to
+                yFilter.update(candidate.second, measurementNoise)
+
+    fun reset() {
+        xFilter.reset()
+        yFilter.reset()
+    }
+}
+
 /**
  * ✅ 将图片拷贝到 App 内部存储，防止源文件丢失
  */
@@ -230,8 +274,9 @@ fun MapCollectScreen(
     var snappedPx by remember { mutableStateOf<Pair<Float, Float>?>(null) }
     var lastPositioningCostMs by remember { mutableLongStateOf(0L) }
     var mapContainerSize by remember { mutableStateOf(IntSize.Zero) }
-    val smoothingAlpha = remember(enableTemporalSmoothing, smoothingFactorInput) {
-        smoothingFactorInput.toDoubleOrNull()?.coerceIn(0.0, 1.0) ?: 0.55
+    val positionKalmanFilter = remember { PositionKalmanFilter2D() }
+    val kalmanMeasurementNoise = remember(enableTemporalSmoothing, smoothingFactorInput) {
+        smoothingFactorInput.toDoubleOrNull()?.coerceIn(0.01, 100.0) ?: 4.0
     }
 
     val beaconCount = liveRows.size
@@ -337,15 +382,16 @@ fun MapCollectScreen(
                 }
                 snappedId = estimate?.fingerprintId
                 snappedPx = estimate?.let {
-                    smoothDisplayedPosition(
-                        previous = snappedPx,
+                    filterDisplayedPosition(
+                        filter = positionKalmanFilter,
                         candidate = it.xPx to it.yPx,
                         enabled = enableTemporalSmoothing,
-                        alpha = smoothingAlpha
+                        measurementNoise = kalmanMeasurementNoise
                     )
                 }
             } else {
                 snappedPx = null
+                positionKalmanFilter.reset()
                 lastPositioningCostMs = 0L
             }
             delay(500)
@@ -356,8 +402,13 @@ fun MapCollectScreen(
         if (!locating) {
             snappedId = null
             snappedPx = null
+            positionKalmanFilter.reset()
             lastPositioningCostMs = 0L
         }
+    }
+
+    LaunchedEffect(currentMap?.id, enableTemporalSmoothing, smoothingFactorInput) {
+        positionKalmanFilter.reset()
     }
 
     Surface(
@@ -643,21 +694,14 @@ private fun CollectionLoadingOverlay(
     }
 }
 
-private fun smoothDisplayedPosition(
-    previous: Pair<Float, Float>?,
+private fun filterDisplayedPosition(
+    filter: PositionKalmanFilter2D,
     candidate: Pair<Float, Float>,
     enabled: Boolean,
-    alpha: Double
+    measurementNoise: Double
 ): Pair<Float, Float> {
-    if (!enabled || previous == null) return candidate
-
-    val safeAlpha = alpha.coerceIn(0.0, 1.0)
-    if (safeAlpha >= 1.0) return candidate
-
-    return Pair(
-        (previous.first * (1 - safeAlpha) + candidate.first * safeAlpha).toFloat(),
-        (previous.second * (1 - safeAlpha) + candidate.second * safeAlpha).toFloat()
-    )
+    if (!enabled) return candidate
+    return filter.update(candidate, measurementNoise)
 }
 
 @Composable
@@ -962,8 +1006,8 @@ fun AlgorithmConfigPanel(
         }
 
         SettingSwitchRow(
-            title = "时间平滑",
-            subtitle = "对连续定位结果做指数平滑，减少跳点",
+            title = "卡尔曼滤波",
+            subtitle = "对连续定位坐标做卡尔曼滤波，减少跳点",
             checked = enableTemporalSmoothing,
             onCheckedChange = onEnableTemporalSmoothingChange
         )
@@ -972,8 +1016,8 @@ fun AlgorithmConfigPanel(
             OutlinedTextField(
                 value = smoothingFactorInput,
                 onValueChange = onSmoothingFactorChange,
-                label = { Text("平滑系数 α") },
-                supportingText = { Text("0 到 1，越大越跟手，越小越平稳") },
+                label = { Text("测量噪声 R") },
+                supportingText = { Text("越大越平稳，越小越跟手，建议 1 到 10") },
                 singleLine = true,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     keyboardType = KeyboardType.Decimal
